@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f2ec">
+  <meta name="description" content="Rencanakan materi, belajar dengan Pomodoro, evaluasi pemahaman, dan ulangi materi sesuai jadwal bersama Pomo.">
+  <title>Pomo — Ruang untuk fokus</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23446b53'/%3E%3Ccircle cx='32' cy='35' r='17' fill='none' stroke='%23fff' stroke-width='4'/%3E%3Cpath d='M32 24v12l7 4M26 9h12M32 9v7' fill='none' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="learning.css">
+  <script src="/eel.js"></script>
+  <script src="learning-core.js" defer></script>
+  <script src="data-store.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="learning.js" defer></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="14" r="8"/><path d="M12 10v4l3 2M9 2h6m-3 0v4m6 1 2-2"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-4v6l4 2"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M9 15v-4m5 4V7m5 8V4"/></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="m9 3-.7 2.4-2 .9L4 5.7 2 9l1.8 1.8v2.4L2 15l2 3.3 2.3-.6 2 .9L9 21h6l.7-2.4 2-.9 2.3.6 2-3.3-1.8-1.8v-2.4L22 9l-2-3.3-2.3.6-2-.9L15 3Z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1.4 7M3 4v6h6"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6C9 4 5 4 2 5v14c3-1 7-1 10 1 3-2 7-2 10-1V5c-3-1-7-1-10 1Zm0 0v14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6Z"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15Zm0 0 1-5 4 4"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3C9 2 3 7 5 14c2 7 13 8 15-11ZM4 21 15 10m-7 7v-5m0 5h5"/></symbol>
+      <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2c1 6-6 6-6 13a6 6 0 0 0 12 0c0-3-1-5-3-7 0 4-2 5-2 5s1-7-1-11Z"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip-link" href="#main">Langsung ke konten</a>
+
+  <aside class="sidebar" aria-label="Panel navigasi">
+    <a class="brand" href="#ringkasan" aria-label="Pomo — Beranda">
+      <span class="brand-mark"><svg class="icon"><use href="#i-timer"/></svg></span>
+      <span>pomo<span class="brand-dot">.</span></span>
+    </a>
+    <p class="brand-caption">SEBUAH RITUAL KECIL.</p>
+
+    <p class="nav-label">RUANG BELAJARMU</p>
+    <nav class="navigation" aria-label="Navigasi utama">
+      <a class="nav-item active" href="#ringkasan" aria-current="location"><svg class="icon"><use href="#i-grid"/></svg><span>Ruang fokus</span><span class="nav-dot"></span></a>
+      <a class="nav-item" href="#materi"><svg class="icon"><use href="#i-book"/></svg><span>Peta materi</span></a>
+      <a class="nav-item" href="#rencana"><svg class="icon"><use href="#i-target"/></svg><span>Rencana belajar</span></a>
+      <a class="nav-item" href="#pengulangan"><svg class="icon"><use href="#i-history"/></svg><span>Pengulangan</span><span class="nav-count" id="review-nav-count" hidden>0</span></a>
+      <a class="nav-item" href="#evaluasi"><svg class="icon"><use href="#i-leaf"/></svg><span>Evaluasi belajar</span></a>
+      <a class="nav-item" href="#riwayat"><svg class="icon"><use href="#i-history"/></svg><span>Riwayat sesi</span></a>
+      <a class="nav-item" href="#statistik"><svg class="icon"><use href="#i-chart"/></svg><span>Statistik</span></a>
+    </nav>
+
+    <div class="sidebar-note">
+      <svg class="plant-art" width="140" height="112" viewBox="0 0 140 112" fill="none" aria-hidden="true">
+        <ellipse cx="70" cy="100" rx="42" ry="5" fill="#dce5d8"/>
+        <path d="M56 76h32l-5 24H61Z" fill="#d1bda0"/>
+        <path d="M72 78V37m0 29L51 51m21 4 20-22" stroke="#65866a" stroke-width="2" stroke-linecap="round"/>
+        <path d="M71 49c-19-1-26-13-25-25 17 1 27 9 25 25Z" fill="#7f9a7a"/>
+        <path d="M73 60c1-21 13-30 29-29-1 18-10 29-29 29Z" fill="#a6b79a"/>
+        <path d="M69 73C51 75 39 65 37 53c17-4 30 3 32 20Z" fill="#a6b79a"/>
+        <circle cx="106" cy="17" r="8" fill="#e7d6b3"/>
+        <path d="m27 32 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#b7c7ae"/>
+      </svg>
+      <p>Tidak perlu buru-buru.<br><strong>Yang penting, bertumbuh.</strong></p>
+      <span>Satu sesi adalah awal yang baik.</span>
+    </div>
+
+    <div class="sidebar-bottom">
+      <button class="nav-item" id="data-button" type="button"><svg class="icon"><use href="#i-book"/></svg><span>Data & cadangan</span></button><button class="nav-item settings-trigger" type="button"><svg class="icon"><use href="#i-settings"/></svg><span>Pengaturan</span></button>
+      <div class="profile"><span class="avatar">P</span><div><strong>Ruang pribadimu</strong><span>Pelajar, pemimpi, pembelajar.</span></div><span class="profile-status" title="Siap untuk belajar"></span></div>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="breadcrumb">Ruang belajar <svg class="icon"><use href="#i-chevron"/></svg><span>Ruang fokus</span></div>
+      <div class="topbar-actions"><span class="preview-badge"><span></span><span id="data-mode-label">Ruang belajar pribadimu</span></span><span class="topbar-divider"></span><time class="date-chip" id="today-date"></time><button class="icon-button" id="help-button" type="button" aria-label="Cara menggunakan Pomo"><svg class="icon"><use href="#i-info"/></svg></button></div>
+    </header>
+
+    <main id="main">
+      <div id="storage-warning" class="notice notice-warning" role="status" hidden></div>
+      <div id="workspace-overview">
+      <section class="page-heading" id="ringkasan" aria-labelledby="page-title">
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> SEDIKIT DEMI SEDIKIT, SETIAP HARI</p><h1 id="page-title">Temukan fokusmu.<br> <span>Nikmati prosesnya.</span></h1><p>Satu hal dalam satu waktu. Beri ruang untuk langkah kecilmu hari ini.</p></div>
+        <div class="heading-aside"><span class="streak-badge"><svg class="icon"><use href="#i-flame"/></svg><strong id="streak-count">0</strong> hari beruntun</span><span>Konsistensi kecil, perubahan besar.</span></div>
+      </section>
+
+      <div id="learning-overview"></div>
+
+      <section class="summary-strip" aria-label="Ringkasan belajar hari ini">
+        <div class="summary-item"><span class="summary-icon sage"><svg class="icon"><use href="#i-timer"/></svg></span><div><span>Waktu fokus hari ini</span><strong id="today-total">1 <small>jam</small> 40 <small>menit</small></strong></div></div>
+        <div class="summary-item"><span class="summary-icon peach"><svg class="icon"><use href="#i-check"/></svg></span><div><span>Sesi terselesaikan</span><strong id="today-sessions">4 <small>sesi</small></strong></div></div>
+        <div class="summary-item"><span class="summary-icon lavender"><svg class="icon"><use href="#i-chart"/></svg></span><div><span>Total fokus minggu ini</span><strong id="week-total">0 <small>menit</small></strong></div><span class="sample-label">Data contoh</span></div>
+      </section>
+
+      <div class="focus-grid">
+        <section class="timer-card" id="focus-studio" data-scene="forest" aria-labelledby="timer-heading">
+          <svg class="landscape" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop class="sky-top" stop-color="#6d806e"/><stop class="sky-bottom" offset="1" stop-color="#b6b795"/></linearGradient><linearGradient id="scene-shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#0f2923" stop-opacity=".12"/><stop offset=".5" stop-color="#0f2923" stop-opacity=".02"/><stop offset="1" stop-color="#102f26" stop-opacity=".8"/></linearGradient><filter id="scene-grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".13"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter><symbol id="pine" viewBox="0 0 80 200"><path d="M37 0 13 48h14L5 87h18L0 131h29v69h17v-69h34L57 87h18L53 48h14Z"/></symbol></defs>
+            <rect width="1000" height="800" fill="url(#sky)"/>
+            <circle class="scene-sun-glow" cx="800" cy="195" r="125" fill="#efe1b3" opacity=".08"/><circle class="scene-sun" cx="800" cy="195" r="63" fill="#e7d4a1" opacity=".8"/>
+            <path class="mountain-back" d="M-50 460 65 387l90 22 134-151 100 84 111-47 101 99 115-73 171 141 113-72v410H-50Z" fill="#82947d"/>
+            <path class="mountain-middle" d="M-50 445c124-99 226 81 352 40s189-150 317-112 220 89 431-8v435H-50Z" fill="#607c67"/>
+            <path class="mountain-front" d="M-50 580c135-18 227-146 353-106s250 125 389 70 205-27 358-72v328H-50Z" fill="#456852"/>
+            <g class="forest-back" fill="#355e49" opacity=".8"><use href="#pine" x="-20" y="355" width="120" height="280"/><use href="#pine" x="90" y="450" width="78" height="210"/><use href="#pine" x="155" y="408" width="102" height="255"/><use href="#pine" x="740" y="430" width="90" height="225"/><use href="#pine" x="840" y="370" width="120" height="300"/><use href="#pine" x="950" y="420" width="100" height="250"/></g>
+            <path class="valley-river" d="M462 535c105 17 194 0 209 31 10 26-184 32-125 63 25 15 100 15 130 34 39 25-25 67-49 137H337c25-74 192-101 176-124-19-27-137-18-137-50 0-40 197-36 182-60-8-14-67-15-96-31Z" fill="#b2b695" opacity=".35"/>
+            <path class="ground-front" d="M-50 652c218-77 316 18 442 37s221-74 346-70 233 42 312 30v151H-50Z" fill="#214b38"/>
+            <g class="forest-front" fill="#163f2f"><use href="#pine" x="-62" y="310" width="160" height="460"/><use href="#pine" x="50" y="485" width="100" height="300"/><use href="#pine" x="138" y="545" width="79" height="235"/><use href="#pine" x="869" y="460" width="120" height="350"/><use href="#pine" x="945" y="290" width="170" height="500"/></g>
+            <rect width="1000" height="800" fill="url(#scene-shade)"/><rect width="1000" height="800" fill="transparent" filter="url(#scene-grain)" opacity=".32"/>
+          </svg>
+          <div class="scene-fireflies" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="card-heading studio-heading"><div class="section-label"><span class="live-dot"></span><h2 id="timer-heading">Ruang fokus</h2></div><div class="studio-actions"><button class="icon-button settings-trigger" type="button" aria-label="Pengaturan durasi timer"><svg class="icon"><use href="#i-settings"/></svg></button><button class="icon-button" id="immersive-button" type="button" aria-label="Masuk mode fokus" aria-pressed="false"><svg class="icon"><use href="#i-expand"/></svg></button></div></div>
+          <div class="immersive-heading"><span>Hanya kamu dan satu hal yang berarti.</span><button type="button" id="exit-immersive">Keluar mode fokus <kbd>Esc</kbd></button></div>
+          <div class="timer-tabs" role="group" aria-label="Pilih jenis sesi"><button class="mode-button active" type="button" data-mode="focus" aria-pressed="true">Fokus</button><button class="mode-button" type="button" data-mode="short" aria-pressed="false">Istirahat pendek</button><button class="mode-button" type="button" data-mode="long" aria-pressed="false">Istirahat panjang</button></div>
+          <div class="timer-dial">
+            <svg class="dial-art" viewBox="0 0 300 300" aria-hidden="true"><circle class="dial-outer" cx="150" cy="150" r="142"/><circle class="dial-track" cx="150" cy="150" r="128"/><circle class="dial-progress" id="dial-progress" cx="150" cy="150" r="128"/></svg>
+            <div class="dial-content"><span id="timer-context">SAATNYA BELAJAR</span><div id="timer-display" role="timer" aria-label="Sisa waktu sesi">25:00</div><span class="timer-state" id="timer-state"><span></span>Siap saat kamu siap</span></div>
+          </div>
+          <div class="session-indicator" aria-label="Siklus Pomodoro"><div class="session-dots" id="session-dots"><i class="current"></i><i></i><i></i><i></i></div><span id="session-label">Sesi 1 dari 4</span></div>
+          <div class="timer-controls"><button class="button button-primary" id="start-button" type="button"><svg class="icon"><use href="#i-play"/></svg><span>Mulai fokus</span></button><button class="button reset-button" id="reset-button" type="button" aria-label="Reset timer"><svg class="icon"><use href="#i-reset"/></svg></button></div>
+          <p class="keyboard-hint"><kbd>spasi</kbd> mulai / jeda <span>·</span> <kbd>F</kbd> mode fokus</p>
+          <div class="studio-bottom"><div class="scene-caption"><span class="scene-caption-dot"></span><span id="scene-caption">Hutan yang tenang</span></div><button class="barrier-trigger" id="log-barrier" type="button">Catat hambatan</button><div class="scene-picker" role="group" aria-label="Pilih suasana ruang fokus"><button class="scene-option active" type="button" data-scene-option="forest" aria-label="Suasana hutan" aria-pressed="true"><span></span>Hutan</button><button class="scene-option" type="button" data-scene-option="sunset" aria-label="Suasana senja" aria-pressed="false"><span></span>Senja</button><button class="scene-option" type="button" data-scene-option="night" aria-label="Suasana malam" aria-pressed="false"><span></span>Malam</button></div></div>
+          <div class="current-topic"><span class="topic-icon"><svg class="icon"><use href="#i-book"/></svg></span><div><label class="topic-label" for="focus-topic-select">MATERI UNTUK SESI INI</label><select id="focus-topic-select"><option value="">Belajar bebas</option></select><label class="visually-hidden" for="study-topic">Topik belajar bebas</label><input id="study-topic" maxlength="160" value="" placeholder="Tulis tujuan sesi belajarmu"></div><svg class="icon topic-pencil" aria-hidden="true"><use href="#i-pencil"/></svg></div>
+        </section>
+
+        <div class="right-column">
+          <section class="card target-card" id="target" aria-labelledby="target-heading">
+            <div class="card-heading"><div class="section-label"><svg class="icon"><use href="#i-target"/></svg><h2 id="target-heading">Target harian</h2></div><span class="small-badge">Hari ini</span></div>
+            <p class="card-description">Beri waktumu tujuan yang sederhana.</p>
+            <div class="target-value"><strong id="goal-current">100</strong><span>/ <span id="goal-total">150</span> <small>menit</small></span></div>
+            <div class="progress-caption"><span id="goal-caption">4 dari 6 sesi fokus</span><strong id="goal-percent">67%</strong></div>
+            <div class="goal-track" id="goal-progress" role="progressbar" aria-label="Pencapaian target harian" aria-valuemin="0" aria-valuemax="150" aria-valuenow="100"><div id="goal-fill"></div></div>
+            <p class="target-encouragement" id="goal-message"><svg class="icon"><use href="#i-spark"/></svg>50 menit lagi. Kamu pasti bisa!</p>
+            <div class="goal-milestones" aria-hidden="true"><span>Mulai</span><span>Setengah jalan</span><span>Tercapai ✦</span></div><button class="button button-outline" id="edit-goal" type="button"><svg class="icon"><use href="#i-pencil"/></svg>Sesuaikan target<svg class="icon"><use href="#i-arrow"/></svg></button>
+          </section>
+
+          <section class="garden-card" aria-labelledby="garden-heading"><div class="garden-header"><span class="eyebrow">KEBUN FOKUSMU</span><svg class="icon"><use href="#i-leaf"/></svg></div><div class="garden-body"><div><h2 id="garden-heading">Fokus hari ini.<br>Tumbuh esok hari.</h2><p id="garden-message">Setiap sesi adalah<br>satu daun baru.</p></div><svg class="garden-art" viewBox="0 0 180 190" fill="none" aria-hidden="true"><circle cx="100" cy="80" r="67" fill="#e2e7ce"/><circle cx="145" cy="34" r="13" fill="#d2a16b"/><ellipse cx="95" cy="175" rx="59" ry="6" fill="#c4ccb2" opacity=".55"/><path d="M70 137h52l-9 37H79Z" fill="#b66b4d"/><path d="M70 137h52v7H70Z" fill="#95523b"/><path d="M97 138V49" stroke="#416647" stroke-width="3" stroke-linecap="round"/><g class="garden-leaf" data-leaf="1"><path d="M97 115C69 115 55 99 58 80c23-1 41 10 39 35Z" fill="#82935f"/><path d="m69 91 28 24" stroke="#a6b584" stroke-width="1.5"/></g><g class="garden-leaf" data-leaf="2"><path d="M98 102c-1-26 14-44 37-44 3 23-10 41-37 44Z" fill="#4e7451"/><path d="m124 70-26 32" stroke="#75946b" stroke-width="1.5"/></g><g class="garden-leaf" data-leaf="3"><path d="M97 78C73 77 63 63 65 45c22 1 34 13 32 33Z" fill="#647f4c"/><path d="m74 55 23 23" stroke="#91a371" stroke-width="1.5"/></g><g class="garden-leaf" data-leaf="4"><path d="M98 62c-2-22 9-34 26-36 4 19-4 32-26 36Z" fill="#8fa173"/></g><path d="m36 120 2 6 6 2-6 2-2 6-2-6-6-2 6-2Zm110-20 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#b4a174"/></svg></div><div class="garden-footer"><span><span class="garden-status-dot"></span><strong id="garden-sessions">4</strong> sesi hari ini</span><span id="garden-stage">Bertumbuh dengan baik</span></div></section>
+        </div>
+      </div>
+
+      <div class="activity-grid">
+        <section class="card statistics-card" id="statistik" aria-labelledby="statistics-heading">
+          <div class="card-heading"><div><h2 id="statistics-heading">Ritme belajarmu</h2><p class="card-description">Setiap menit adalah langkah maju.</p></div><label class="visually-hidden" for="chart-period">Periode statistik</label><select id="chart-period"><option value="0">Minggu ini</option><option value="1">Minggu lalu</option></select></div>
+          <div class="chart-summary"><strong id="chart-total">0 <small>menit</small></strong><span><i></i>Waktu fokus</span></div>
+          <div class="weekly-chart" aria-label="Grafik waktu fokus selama tujuh hari"><div class="chart-axis" aria-hidden="true"><span id="axis-top">180 m</span><span id="axis-middle">90 m</span><span>0</span></div><div class="chart-plot"><div class="chart-gridlines" aria-hidden="true"><i></i><i></i><i></i></div><div class="chart-bars" id="chart-bars"></div></div></div>
+          <div class="chart-footer"><svg class="icon"><use href="#i-spark"/></svg><span id="chart-insight">Kebiasaan baik dibangun satu hari pada satu waktu.</span></div>
+        </section>
+
+        <section class="card history-card" id="riwayat" aria-labelledby="history-heading">
+          <div class="card-heading"><div><h2 id="history-heading">Sesi terakhir</h2><p class="card-description">Waktu yang sudah kamu investasikan.</p></div><span class="small-badge" id="history-count">4 sesi</span></div>
+          <div class="history-list" id="history-list"></div>
+          <button class="history-more" id="history-more" type="button">Lihat semua riwayat<svg class="icon"><use href="#i-arrow"/></svg></button>
+        </section>
+      </div>
+
+      </div>
+      <div id="learning-pages"></div>
+      <footer class="page-footer"><span><span class="footer-dot"></span>Dibuat untuk pikiran yang ingin bertumbuh.</span><span>pomo. <span class="footer-divider">/</span> Waktu yang lebih berarti.</span></footer>
+    </main>
+  </div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form"><div class="dialog-heading"><div><p class="eyebrow">ATUR RITMEMU</p><h2 id="settings-title">Pengaturan fokus</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Tutup pengaturan"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="dialog-description">Temukan durasi yang paling nyaman untukmu.</p>
+      <label class="form-field" for="focus-duration">Durasi fokus <span>menit</span><input id="focus-duration" type="number" min="1" max="120" step="1" value="25" required></label>
+      <div class="form-row"><label class="form-field" for="short-duration">Istirahat pendek<input id="short-duration" type="number" min="1" max="60" step="1" value="5" required></label><label class="form-field" for="long-duration">Istirahat panjang<input id="long-duration" type="number" min="1" max="60" step="1" value="15" required></label></div>
+      <p class="form-note">Durasi dalam menit. Perubahan akan mengulang timer saat ini.</p><button class="button button-primary dialog-submit" type="submit">Simpan pengaturan<svg class="icon"><use href="#i-check"/></svg></button>
+    </form>
+  </dialog>
+
+  <dialog id="goal-dialog" aria-labelledby="goal-dialog-title"><form id="goal-form"><div class="dialog-heading"><div><p class="eyebrow">SATU LANGKAH SETIAP HARI</p><h2 id="goal-dialog-title">Target belajarmu</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Tutup target harian"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="dialog-description">Pilih target yang realistis. Konsistensi lebih berarti.</p><label class="form-field" for="daily-goal">Waktu fokus per hari <span>menit</span><input id="daily-goal" type="number" min="5" max="1440" step="1" value="150" required></label><div class="goal-presets" role="group" aria-label="Pilihan cepat target harian"><button type="button" data-goal="60">60 menit</button><button type="button" data-goal="120">120 menit</button><button type="button" data-goal="150">150 menit</button></div><button class="button button-primary dialog-submit" type="submit">Simpan target<svg class="icon"><use href="#i-check"/></svg></button></form></dialog>
+
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><div><p class="eyebrow">KENALAN DENGAN POMO</p><h2 id="help-title">Rencanakan, fokus, pahami.</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Tutup panduan"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="dialog-description">Jalani satu alur belajar yang saling terhubung.</p><ol class="help-steps"><li><strong>Susun peta materi.</strong><span>Tambah mata pelajaran, topik, estimasi waktu, dan tenggat.</span></li><li><strong>Buat rencana harian.</strong><span>Sesi disusun dari pengulangan jatuh tempo, tenggat terdekat, lalu prioritas.</span></li><li><strong>Mulai sesi dari rencana.</strong><span>Timer mengikuti materi dan durasi yang dipilih. Istirahat tidak dihitung sebagai waktu belajar.</span></li><li><strong>Catat pemahaman.</strong><span>Setelah fokus selesai, isi ringkasan dan penilaian diri. Materi ditandai selesai hanya berdasarkan pilihanmu.</span></li><li><strong>Ulangi dan evaluasi.</strong><span>Paham dijadwalkan lagi 3 hari kemudian, lalu 7, 14, dan 30 hari saat pengulangan berhasil. Masih ragu atau perlu ulang dijadwalkan besok.</span></li></ol><p class="preview-note">Data tersimpan di browser perangkat ini. Gunakan Data & cadangan untuk mengekspor atau mengimpor berkas JSON. Pengingat pengulangan ditampilkan saat aplikasi dibuka.</p><button class="button button-primary dialog-submit" type="button" data-close-dialog>Siap untuk belajar<svg class="icon"><use href="#i-arrow"/></svg></button></dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

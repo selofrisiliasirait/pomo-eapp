@@ -1,0 +1,157 @@
+const { spawn } = require('node:child_process');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..'), output = path.join(root, '.preview');
+const baseURL = process.env.POMO_TEST_URL || 'http://127.0.0.1:4175/';
+let child, socket, diagnose;
+let checksPassed = 0;
+const errors = [];
+async function main() {
+  await fs.mkdir(output, { recursive: true });
+  const candidates = [process.env.POMO_BROWSER_PATH, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].filter(Boolean);
+  let browserPath;
+  for (const candidate of candidates) { try { await fs.access(candidate); browserPath = candidate; break; } catch {} }
+  if (!browserPath) throw new Error('Set POMO_BROWSER_PATH to an installed Chrome or Edge executable.');
+  const endpoint = await new Promise((resolve, reject) => {
+    child = spawn(browserPath, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + path.join(output, 'study-qa-' + Date.now()), '--no-first-run', '--no-default-browser-check', '--disable-background-networking', 'about:blank'], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    child.on('error', reject); let stderr = '';
+    child.stderr.on('data', data => { stderr += data; const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (match) resolve(match[1]); });
+    setTimeout(() => reject(new Error('Browser startup timeout')), 10000).unref();
+  });
+  const target = await (await fetch('http://' + new URL(endpoint).host + '/json/new?about:blank', { method: 'PUT' })).json();
+  socket = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+  let sequence = 0; const pending = new Map(), events = new Map();
+  socket.onmessage = event => {
+    const message = JSON.parse(event.data);
+    if (message.id) { const task = pending.get(message.id); if (task) { clearTimeout(task.timeout); pending.delete(message.id); message.error ? task.reject(new Error(JSON.stringify(message.error))) : task.resolve(message.result); } }
+    else { if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text); if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params.args.map(r => r.value || r.description).join(' ')); (events.get(message.method) || []).forEach(resolve => resolve(message.params)); events.delete(message.method); }
+  };
+  const send = (method, params = {}) => new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 10000); pending.set(id, { resolve, reject, timeout }); socket.send(JSON.stringify({ id, method, params })); });
+  const once = method => new Promise(resolve => events.set(method, [...(events.get(method) || []), resolve]));
+  const evaluate = async expression => { const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text); return result.result.value; };
+  const assert = (condition, message) => { if (!condition) throw new Error(message); checksPassed++; console.log('PASS ' + message); };
+  const waitFor = async expression => { const until = Date.now() + 5000; while (Date.now() < until) { if (await evaluate(expression)) return; await new Promise(resolve => setTimeout(resolve, 10)); } throw new Error('Waiting for: ' + expression); };
+  const advance = async milliseconds => { await evaluate('window.__qaAdvance(' + milliseconds + ')'); await new Promise(resolve => setTimeout(resolve, 350)); };
+  const navigate = async (url = baseURL) => { const loaded = once('Page.loadEventFired'); await send('Page.navigate', { url }); await loaded; };
+  const click = selector => evaluate('document.querySelector(' + JSON.stringify(selector) + ').click()');
+  const fill = (form, values) => evaluate('(() => { const f = document.getElementById(' + JSON.stringify(form) + '); const data = ' + JSON.stringify(values) + '; for (const [key, value] of Object.entries(data)) { const field = f.elements.namedItem(key); if (typeof value === "boolean") field.checked = value; else field.value = value; } })()');
+  const submit = form => evaluate('document.getElementById(' + JSON.stringify(form) + ').requestSubmit()');
+  const value = expression => evaluate('(() => { const {courses,topics,sessions,plans,reviews,checkpoints,timer,distractions,interruptions,preferences,scene}=PomoStore.state; return (' + expression + '); })()');
+  const route = async name => { await click('.navigation a[href="#' + name + '"]'); await waitFor(name === 'ringkasan' ? '!document.getElementById("workspace-overview").hidden' : '!document.querySelector("[data-route=' + name + ']").hidden'); };
+  const shot = async (name, full = true) => { const metrics = await send('Page.getLayoutMetrics'); const size = await evaluate('({width:innerWidth,height:innerHeight})'); const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: full, clip: { x: 0, y: 0, width: full ? metrics.cssContentSize.width : size.width, height: full ? metrics.cssContentSize.height : size.height, scale: 1 } }); await fs.writeFile(path.join(output, name + '.png'), Buffer.from(result.data, 'base64')); };
+  diagnose = async () => { console.error('UI diagnostic', await evaluate('({route:location.hash,dialogs:[...document.querySelectorAll("dialog[open]")].map(r=>r.id),formErrors:[...document.querySelectorAll(".form-error")].map(r=>r.textContent).filter(Boolean),toast:document.getElementById("toast").textContent,timer:PomoStore.state.timer,now:Date.now(),finishing:document.getElementById("start-button").disabled,persistent:PomoStore.persistent})')); console.error('Runtime errors', errors); await shot('study-failure', false); };
+  await send('Page.enable'); await send('Runtime.enable');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: '(() => { const NativeDate = Date; let shift = 0; try { shift = Number(sessionStorage.getItem("qa-clock-shift")) || 0; } catch {} class ClockDate extends NativeDate { constructor(...args) { super(...(args.length ? args : [NativeDate.now() + shift])); } static now() { return NativeDate.now() + shift; } } globalThis.Date = ClockDate; globalThis.__qaAdvance = milliseconds => { shift += milliseconds; try { sessionStorage.setItem("qa-clock-shift", String(shift)); } catch {} }; })();' });
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await navigate();
+  assert(await evaluate('!!window.PomoLearning && !!window.PomoApp'), 'All application modules initialize');
+  assert(await value('topics.length === 0 && sessions.length === 0'), 'New users start with real empty data');
+  await route('materi'); await click('#materials-page header [data-action="course-add"]');
+  await fill('course-form', { name: 'Basis Data', goal: 'Memahami relasi dan menulis SQL', color: 'green' }); await submit('course-form');
+  assert(await value('courses.length === 1'), 'Course creation saves data');
+  await click('#materials-page header [data-action="topic-add"]');
+  const courseId = await value('courses[0].id');
+  const today = await evaluate('PomoCore.today()'), later = await evaluate('PomoCore.offset(PomoCore.today(),2)');
+  await fill('topic-form', { courseId, title: 'Normalisasi <3NF>', estimate: 2, deadline: today, priority: 'high', outcome: 'Menormalisasi tabel tanpa contoh', notes: '<img src=x onerror=alert(1)> harus tampil sebagai teks.' }); await submit('topic-form');
+  assert(await value('topics.length === 1'), 'Topic creation saves estimates, outcomes, and deadlines');
+  assert(await evaluate('!document.querySelector("img[src=x]")'), 'User notes are escaped instead of executed');
+  await click('#materials-page header [data-action="topic-add"]');
+  await fill('topic-form', { courseId, title: 'Latihan SELECT dan JOIN', estimate: 3, deadline: later, priority: 'normal', outcome: 'Menulis JOIN dua tabel', notes: 'Latihan bab 4' }); await submit('topic-form');
+  const topicId = await value('topics[0].id'), secondId = await value('topics[1].id');
+  await click('.sidebar .settings-trigger'); await fill('settings-form', { 'focus-duration': 1, 'short-duration': 1, 'long-duration': 2 }); await submit('settings-form');
+  await route('rencana'); await evaluate('document.getElementById("plan-budget").value="5"'); await click('#planner-page [data-action="plan-generate"]');
+  assert(await value('plans.length === 5 && plans.reduce((n,r)=>n+r.minutes,0) === 5'), 'Automatic planning respects capacity and splits topics');
+  assert(await value('plans[0].topicId === ' + JSON.stringify(topicId)), 'Nearest high-priority topic is scheduled first');
+  const planId = await value('plans[0].id'); await click('[data-action="plan-start"][data-id="' + planId + '"]');
+  await waitFor('PomoStore.state.timer.running'); assert(await value('timer.topicId === ' + JSON.stringify(topicId)), 'Plan starts timer with linked topic');
+  await click('#log-barrier'); assert(await value('!timer.running'), 'Logging a barrier pauses an active timer');
+  await fill('barrier-form', { category: 'difficult', note: 'Masih bingung tentang ketergantungan transitif', resume: true }); await submit('barrier-form');
+  await waitFor('PomoStore.state.timer.running'); assert(await value('distractions.length === 1'), 'Barrier saves and timer resumes');
+  await advance(63000); await waitFor('PomoStore.state.sessions.length === 1'); await waitFor('document.getElementById("checkpoint-dialog").open');
+  assert(await value('plans[0].status === "done" && checkpoints.length === 1'), 'Completion links plan and creates one checkpoint');
+  await submit('checkpoint-form'); assert(await value('!checkpoints[0].submitted'), 'Empty checkpoint cannot be submitted');
+  await fill('checkpoint-form', { summary: '1NF menjaga nilai atomik. 2NF menghilangkan ketergantungan parsial. 3NF masih perlu latihan.', rating: 'repeat', completeTopic: false }); await submit('checkpoint-form');
+  assert(await value('reviews.length === 1 && reviews[0].due === PomoCore.offset(PomoCore.today(),1)'), 'Needs-repeat checkpoint schedules tomorrow');
+  assert(await value('topics[0].status === "active"'), 'Session duration does not automatically mark material mastered');
+  await route('pengulangan'); const reviewId = await value('reviews[0].id');
+  await click('[data-action="review-edit"][data-id="' + reviewId + '"]'); await fill('review-form', { due: today, note: 'Ulangi contoh transitif hari ini' }); await submit('review-form');
+  assert(await evaluate('document.getElementById("review-nav-count").textContent === "1"'), 'Due-review reminder updates in navigation');
+  await click('[data-action="review-start"][data-id="' + reviewId + '"]'); await waitFor('PomoStore.state.timer.running');
+  await advance(10000); await click('#start-button'); const paused = await value('timer.remaining'); await navigate();
+  assert(await value('!timer.running && timer.remaining === ' + paused), 'Paused timer survives reload with its linked context');
+  await click('#start-button'); await advance(63000); await waitFor('PomoStore.state.sessions.length === 2'); await waitFor('document.getElementById("checkpoint-dialog").open');
+  await fill('checkpoint-form', { summary: 'Sekarang bisa mengurai ketergantungan transitif dan membentuk tabel 3NF.', rating: 'understood', completeTopic: true }); await submit('checkpoint-form');
+  assert(await value('topics[0].status === "completed"'), 'Explicit checkbox marks material complete');
+  assert(await value('reviews.filter(r=>r.status==="done").length === 1 && reviews.filter(r=>r.status==="pending").length === 1'), 'Review completion preserves history and creates one next review');
+  assert(await value('reviews.find(r=>r.status==="pending").due === PomoCore.offset(PomoCore.today(),3)'), 'Review progression schedules the correct next interval');
+  assert(await value('plans.filter(r=>r.topicId===' + JSON.stringify(topicId) + '&&r.status==="todo"&&!r.reviewId).length===0'), 'Completing a topic retires its unnecessary pending study sessions');
+  await route('materi'); await shot('study-materials');
+  await click('[data-action="topic-start"][data-id="' + secondId + '"]'); await waitFor('PomoStore.state.timer.running'); await advance(10000); await click('#reset-button');
+  assert(await value('interruptions.length === 1 && sessions.length === 2'), 'Reset records interruption without adding study time');
+  await route('evaluasi'); assert(await evaluate('document.getElementById("evaluation-summary").textContent.includes("2 menit")'), 'Evaluation aggregates only completed study minutes');
+  assert(await evaluate('document.getElementById("barrier-list").textContent.includes("Materi sulit")'), 'Logged barriers appear in evaluations');
+  assert(await evaluate('document.querySelector("#checkpoint-list .reflection-card > div").getBoundingClientRect().width > 500'), 'Checkpoint text keeps readable width next to its action button'); await shot('study-evaluation');
+  await route('rencana'); await click('#planner-page header [data-action="plan-add"]'); await fill('plan-form', { topicId: secondId, date: later, minutes: 2 }); await submit('plan-form');
+  const manualId = await value('plans[plans.length-1].id');
+  await click('[data-action="plan-edit"][data-id="' + manualId + '"]'); await fill('plan-form', { minutes: 3 }); await submit('plan-form');
+  assert(await value('plans.find(r=>r.id===' + JSON.stringify(manualId) + ').minutes === 3'), 'Manual planned session can be edited');
+  await click('[data-action="plan-skip"][data-id="' + manualId + '"]'); await click('[data-action="plan-restore"][data-id="' + manualId + '"]');
+  assert(await value('plans.find(r=>r.id===' + JSON.stringify(manualId) + ').status === "todo"'), 'Skipped sessions can be scheduled again'); await shot('study-plan');
+  await click('[data-action="plan-delete"][data-id="' + manualId + '"]'); await waitFor('document.getElementById("confirm-dialog").open'); await click('#confirm-accept');
+  assert(await value('!plans.some(r=>r.id===' + JSON.stringify(manualId) + ')'), 'Plan deletion requires confirmation and removes the entry');
+  await route('pengulangan'); await shot('study-review');
+  const downloadPath = path.join(output, 'study-downloads-' + Date.now()); await fs.mkdir(downloadPath, { recursive: true });
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath });
+  await click('#data-button'); await click('#export-data');
+  let files = []; for (let tries = 0; tries < 100; tries++) { files = (await fs.readdir(downloadPath)).filter(name => name.endsWith('.json')); if (files.length) break; await new Promise(resolve => setTimeout(resolve, 20)); }
+  assert(files.length === 1, 'Export button downloads a JSON backup');
+  const backupPath = path.join(downloadPath, files[0]), backup = JSON.parse(await fs.readFile(backupPath, 'utf8'));
+  assert(backup.application === 'pomo-study' && backup.data.sessions.length === 2, 'Downloaded backup includes linked study records');
+  const invalidPath = path.join(output, 'invalid-study-backup.json'); await fs.writeFile(invalidPath, '{"application":"other"}');
+  async function importFile(filename) { const doc = await send('DOM.getDocument'); const node = await send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#import-file' }); await send('DOM.setFileInputFiles', { nodeId: node.nodeId, files: [filename] }); }
+  await importFile(invalidPath); await waitFor('document.getElementById("data-error").textContent.includes("ditolak")');
+  assert(await value('sessions.length === 2 && topics.length === 2'), 'Invalid import leaves existing data untouched');
+  await importFile(backupPath); await waitFor('!document.getElementById("import-apply").hidden'); await click('#import-apply'); await waitFor('document.getElementById("confirm-dialog").open'); await click('#confirm-accept');
+  await waitFor('!document.getElementById("confirm-dialog").open'); assert(await value('sessions.length === 2 && topics.length === 2 && !timer.running'), 'Valid backup restores data and stops imported timer');
+  await navigate(); assert(await value('topics.length === 2 && sessions.length === 2 && checkpoints.every(r=>r.submitted)'), 'All workflow data survives page reload');
+  await route('ringkasan'); await shot('study-overview');
+  for (const width of [1024, 768, 620, 390, 320]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width < 601 });
+    for (const page of ['ringkasan', 'materi', 'rencana', 'pengulangan', 'evaluasi']) {
+      await route(page); assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'), page + ' has no horizontal overflow at ' + width + 'px');
+    }
+    if (width === 390) { await route('materi'); await shot('study-mobile'); }
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await route('materi'); await click('[data-action="topic-start"][data-id="' + secondId + '"]'); await waitFor('PomoStore.state.timer.running'); await advance(10000);
+  const runningId = await value('timer.id'); await navigate();
+  assert(await value('timer.running && timer.id === ' + JSON.stringify(runningId)), 'Running timer survives reload without losing session identity');
+  await advance(63000); await waitFor('PomoStore.state.sessions.length === 3'); await waitFor('document.getElementById("checkpoint-dialog").open');
+  await click('#checkpoint-dialog .dialog-later'); await navigate();
+  assert(await value('checkpoints.filter(r=>!r.submitted).length === 1'), 'Deferred checkpoint survives reload');
+  assert(await evaluate('document.getElementById("learning-overview").textContent.includes("checkpoint belum diisi")'), 'Deferred checkpoint remains visible in the dashboard');
+  await click('#learning-overview [data-action="checkpoint"]'); await fill('checkpoint-form', { summary: 'SELECT sudah jelas, JOIN masih membutuhkan latihan.', rating: 'unsure', completeTopic: false }); await submit('checkpoint-form');
+  await route('pengulangan'); const secondReview = await value('reviews.find(r=>r.topicId===' + JSON.stringify(secondId) + '&&r.status==="pending").id');
+  await click('[data-action="review-edit"][data-id="' + secondReview + '"]'); await fill('review-form', { due: later, note: 'Latihan mandiri JOIN dua tabel' }); await submit('review-form');
+  await click('[data-action="review-defer"][data-id="' + secondReview + '"]');
+  assert(await value('reviews.find(r=>r.id===' + JSON.stringify(secondReview) + ').due === PomoCore.offset(PomoCore.today(),1)'), 'Review date can be edited and deferred until tomorrow');
+  await route('materi'); await click('[data-action="course-edit"][data-id="' + courseId + '"]'); await fill('course-form', { name: 'Basis Data Lanjutan' }); await submit('course-form');
+  assert(await value('courses[0].name === "Basis Data Lanjutan"'), 'Course editing preserves linked material');
+  await click('[data-action="topic-edit"][data-id="' + secondId + '"]'); await fill('topic-form', { title: 'Latihan SQL praktik', estimate: 4 }); await submit('topic-form');
+  assert(await value('topics.find(r=>r.id===' + JSON.stringify(secondId) + ').estimate === 4'), 'Topic estimates and content can be edited');
+  await evaluate('document.getElementById("material-search").value="Normalisasi"; document.getElementById("material-search").dispatchEvent(new Event("input"))');
+  assert(await evaluate('document.querySelectorAll("#topic-list .topic-card").length === 1'), 'Search filters material cards');
+  await evaluate('document.getElementById("material-search").value=""; document.getElementById("material-search").dispatchEvent(new Event("input"))');
+  await click('[data-action="topic-delete"][data-id="' + secondId + '"]'); await waitFor('document.getElementById("confirm-dialog").open'); await click('#confirm-accept');
+  assert(await value('topics.length===1 && sessions.length===3 && checkpoints.length===3 && !reviews.some(r=>r.topicId===' + JSON.stringify(secondId) + ')'), 'Topic deletion cleans schedules and preserves learning history');
+  await click('[data-action="course-delete"][data-id="' + courseId + '"]'); await waitFor('document.getElementById("confirm-dialog").open'); await click('#confirm-accept');
+  assert(await value('courses.length===0 && topics.length===0 && sessions.length===3 && checkpoints.length===3'), 'Course deletion preserves historic sessions and reflections');
+  await navigate('file:///' + path.join(root, 'index.html').replaceAll('\\', '/'));
+  assert(await evaluate('!!window.PomoLearning && !!window.PomoStore && !document.getElementById("storage-warning").textContent'), 'Application opens directly from index.html without a server');
+  assert(errors.length === 0, 'No JavaScript runtime or rendering errors');
+  await fs.writeFile(path.join(output, 'validation-summary.json'), JSON.stringify({ checkedAt: new Date().toISOString(), browserChecksPassed: checksPassed, responsiveWidths: [320, 390, 620, 768, 1024, 1440], directFileVerified: true, runtimeErrors: errors }, null, 2));
+  console.log('All ' + checksPassed + ' browser workflow checks passed.'); await send('Browser.close').catch(() => {});
+}
+main().catch(async error => { console.error(error.stack); if (diagnose) await diagnose().catch(() => {}); process.exitCode = 1; }).finally(() => { socket?.close(); child?.kill(); });
