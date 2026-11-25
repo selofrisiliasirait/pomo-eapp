@@ -1,6 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const C = require('../learning-core.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const corePath = fs.existsSync(path.join(__dirname, '../web/learning-core.js'))
+  ? '../web/learning-core.js'
+  : '../learning-core.js';
+const C = require(corePath);
 const NOW = Date.parse('2026-11-19T09:00:00Z');
 const TODAY = C.today(NOW);
 function fixture() {
